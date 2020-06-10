@@ -1,0 +1,20 @@
+<div *ngFor="let parentFilter of filters">
+  <button (click)="toggleParentFilter(parentFilter)">
+    {{ parentFilter.value }}
+  </button>
+  <ul *ngIf="activeParentFilterLookupValue === parentFilter.lookupValue">
+    <li
+      *ngFor="let filter of parentFilter.children; trackBy: trackByFilter"
+      (click)="toggleFilter(filter)"
+    >
+      <label>
+        {{ filter.value }}
+        <input
+          type="radio"
+          [value]="filter.lookupValue"
+          [checked]="filter.active"
+        />
+      </label>
+    </li>
+  </ul>
+</div>
