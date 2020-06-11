@@ -123,6 +123,10 @@
           }
         }
       }
-    }},
-  "defaultProject": "filters-poc"
+    }
+  },
+  "defaultProject": "filters-poc",
+  "cli": {
+    "analytics": false
+  }
 }

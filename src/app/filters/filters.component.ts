@@ -1,14 +1,17 @@
-import { Component, EventEmitter, Input, OnInit, Output } from "@angular/core";
-import { Filter } from "./filters.model";
+import { Component, EventEmitter, Input, OnInit, Output } from '@angular/core';
+import { Filter, HashMap } from './filters.model';
 
 @Component({
-  selector: "app-filters",
-  templateUrl: "./filters.component.html",
-  styleUrls: ["./filters.component.scss"],
+  selector: 'app-filters',
+  templateUrl: './filters.component.html',
+  styleUrls: ['./filters.component.scss'],
 })
 export class FiltersComponent implements OnInit {
   @Input()
   filters: Filter[];
+
+  @Input()
+  activeFilters: HashMap<boolean> = {};
 
   @Output()
   activate = new EventEmitter<Filter>();
@@ -16,36 +19,28 @@ export class FiltersComponent implements OnInit {
   @Output()
   deactivate = new EventEmitter<Filter>();
 
-  activeParentFilterLookupValue: string;
-
-  constructor() {}
+  expandedParentFilterLookupValue: string;
 
   ngOnInit() {}
 
-  ngOnChanges() {
-    console.log("Change");
-    console.log(this.filters);
-  }
-
+  /**
+   * Internal state that determines which parent filter is open.
+   */
   toggleParentFilter(filter: Filter) {
-    this.activeParentFilterLookupValue =
-      this.activeParentFilterLookupValue === filter.lookupValue
+    this.expandedParentFilterLookupValue =
+      this.expandedParentFilterLookupValue === filter.lookupValue
         ? undefined
         : filter.lookupValue;
   }
 
+  /**
+   * Events of the interaction with the filters.
+   */
   toggleFilter(filter: Filter) {
-    // Break the reference to prevent 2-way bind side effects
-    const event = Object.assign({}, filter);
-    if (filter.active) {
-      this.deactivate.next(event);
+    if (this.activeFilters[filter.lookupValue]) {
+      this.deactivate.next(filter);
     } else {
-      this.activate.next(event);
+      this.activate.next(filter);
     }
-  }
-
-  trackByFilter(_index: number, filter: Filter) {
-    console.log(`${filter.lookupValue}:${filter.active}`);
-    return `${filter.lookupValue}:${filter.active}`;
   }
 }

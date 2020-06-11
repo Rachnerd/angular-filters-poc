@@ -1,5 +1,11 @@
 <app-filters
+  *ngIf="filters$ | async as filters; else loading"
   [filters]="filters"
+  [activeFilters]="activeFilters$ | async"
   (activate)="activateFilter($event)"
   (deactivate)="deactivateFilter($event)"
 ></app-filters>
+
+<ng-template #loading>
+  LOADING
+</ng-template>

@@ -2,9 +2,9 @@
   <button (click)="toggleParentFilter(parentFilter)">
     {{ parentFilter.value }}
   </button>
-  <ul *ngIf="activeParentFilterLookupValue === parentFilter.lookupValue">
+  <ul *ngIf="expandedParentFilterLookupValue === parentFilter.lookupValue">
     <li
-      *ngFor="let filter of parentFilter.children; trackBy: trackByFilter"
+      *ngFor="let filter of parentFilter.children"
       (click)="toggleFilter(filter)"
     >
       <label>
@@ -12,7 +12,7 @@
         <input
           type="radio"
           [value]="filter.lookupValue"
-          [checked]="filter.active"
+          [checked]="activeFilters[filter.lookupValue]"
         />
       </label>
     </li>
