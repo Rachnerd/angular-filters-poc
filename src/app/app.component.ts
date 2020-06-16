@@ -1,8 +1,8 @@
 import { Component } from '@angular/core';
 import { Filter, SearchState } from './filters/filters.model';
-import { SearchService } from './filters/search.service';
 import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
+import { SearchStateService } from './filters/search-state.service';
 
 @Component({
   selector: 'app-root',
@@ -13,8 +13,8 @@ export class AppComponent {
   filtersState$: Observable<SearchState>;
   printState$: Observable<any>;
 
-  constructor(private searchService: SearchService) {
-    this.filtersState$ = this.searchService.state$;
+  constructor(private searchStateService: SearchStateService) {
+    this.filtersState$ = this.searchStateService.state$;
     this.printState$ = this.filtersState$.pipe(
       map((state) => ({
         activeFiltersMap: state.activeFiltersMap,
@@ -25,20 +25,20 @@ export class AppComponent {
   }
 
   ngAfterViewInit() {
-    this.searchService.search();
+    this.searchStateService.search();
 
     setTimeout(() => {
-      this.searchService.loadResults(10);
+      this.searchStateService.loadResults(10);
     }, 2000);
   }
 
   activateFilter(filter: Filter) {
     console.log('Activate');
-    this.searchService.activateFilter(filter);
+    this.searchStateService.activateFilter(filter);
   }
 
   deactivateFilter(filter: Filter) {
     console.log('Deactivate');
-    this.searchService.deactivateFilter(filter);
+    this.searchStateService.deactivateFilter(filter);
   }
 }
