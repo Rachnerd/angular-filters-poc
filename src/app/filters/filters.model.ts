@@ -29,26 +29,23 @@ export enum StateUpdateType {
   RESET,
 }
 
-export interface SearchStateUpdateEvent<T, P> {
+export interface Action<T, P> {
   type: T;
   payload: P;
 }
 
-type ResetSearchStateEvent = SearchStateUpdateEvent<
-  StateUpdateType.RESET,
-  void
->;
-type ChangeFilterSearchStateEvent = SearchStateUpdateEvent<
+type ResetStateAction = Action<StateUpdateType.RESET, void>;
+type ChangeFilterAction = Action<
   StateUpdateType.ACTIVATE_FILTER | StateUpdateType.DEACTIVATE_FILTER,
   string
 >;
 
-type ChangeAmountOfResultsSearchStateEvent = SearchStateUpdateEvent<
+type ChangeAmountOfResultsAction = Action<
   StateUpdateType.AMOUNT_OF_RESULTS,
   number
 >;
 
-export type SearchStateUpdateEventUnion =
-  | ResetSearchStateEvent
-  | ChangeFilterSearchStateEvent
-  | ChangeAmountOfResultsSearchStateEvent;
+export type SearchStateActionUnion =
+  | ResetStateAction
+  | ChangeFilterAction
+  | ChangeAmountOfResultsAction;

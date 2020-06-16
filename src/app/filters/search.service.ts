@@ -4,7 +4,7 @@ import {
   Filter,
   SearchState,
   SearchStateUpdate,
-  SearchStateUpdateEventUnion,
+  SearchStateActionUnion,
   StateUpdateType,
 } from './filters.model';
 import {
@@ -42,7 +42,7 @@ export class SearchService {
 
   private requestOptions$ = new Subject<any>();
   private cachedState$ = new Subject<SearchState>();
-  private stateUpdate$ = new Subject<SearchStateUpdateEventUnion>();
+  private stateUpdate$ = new Subject<SearchStateActionUnion>();
 
   constructor() {
     this.initState();
@@ -78,7 +78,7 @@ export class SearchService {
      * Combine incoming updates with cached state to create optimistic state.
      */
     const optimisticState$: Observable<SearchState> = this.stateUpdate$.pipe(
-      scan<SearchStateUpdateEventUnion, SearchStateUpdate>(
+      scan<SearchStateActionUnion, SearchStateUpdate>(
         this.stateUpdateReducer,
         EMPTY_SEARCH_STATE_UPDATE
       ),
@@ -145,29 +145,29 @@ export class SearchService {
    */
   private stateUpdateReducer(
     queuedUpdates: SearchStateUpdate,
-    event: SearchStateUpdateEventUnion
+    action: SearchStateActionUnion
   ): SearchStateUpdate {
-    if (event.type === StateUpdateType.RESET) {
+    if (action.type === StateUpdateType.RESET) {
       return EMPTY_SEARCH_STATE_UPDATE;
     }
 
-    if (event.type === StateUpdateType.AMOUNT_OF_RESULTS) {
+    if (action.type === StateUpdateType.AMOUNT_OF_RESULTS) {
       return {
         ...queuedUpdates,
-        amountOfResultsUpdate: event.payload,
+        amountOfResultsUpdate: action.payload,
       };
     }
 
     const { activeFiltersUpdateMap } = queuedUpdates;
 
     if (
-      event.type === StateUpdateType.ACTIVATE_FILTER ||
-      event.type === StateUpdateType.DEACTIVATE_FILTER
+      action.type === StateUpdateType.ACTIVATE_FILTER ||
+      action.type === StateUpdateType.DEACTIVATE_FILTER
     ) {
-      const activate = event.type === StateUpdateType.ACTIVATE_FILTER;
-      if (activeFiltersUpdateMap[event.payload] === !activate) {
+      const activate = action.type === StateUpdateType.ACTIVATE_FILTER;
+      if (activeFiltersUpdateMap[action.payload] === !activate) {
         // Cancel opposite queued update.
-        delete activeFiltersUpdateMap[event.payload];
+        delete activeFiltersUpdateMap[action.payload];
         return {
           ...queuedUpdates,
           activeFiltersUpdateMap,
@@ -178,7 +178,7 @@ export class SearchService {
           ...queuedUpdates,
           activeFiltersUpdateMap: {
             ...activeFiltersUpdateMap,
-            [event.payload]: activate,
+            [action.payload]: activate,
           },
         };
       }
