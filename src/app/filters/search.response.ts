@@ -8,20 +8,7 @@ export const SERVER_SIDE_FILTERS = [
         value: 'Parent1Child1',
         active: true,
         lookupValue: 'parent1child1',
-        children: [
-          {
-            value: 'Parent1Child1Child1',
-            active: true,
-            lookupValue: 'parent1child1child1',
-            children: [],
-          },
-          {
-            value: 'Parent1Child1Child2',
-            active: true,
-            lookupValue: 'parent1child1child2',
-            children: [],
-          },
-        ],
+        children: [],
       },
       {
         value: 'Fails to activate',

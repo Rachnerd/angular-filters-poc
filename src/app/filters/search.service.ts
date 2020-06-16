@@ -1,101 +1,203 @@
 import { Injectable } from '@angular/core';
-import { combineLatest, NEVER, Observable, of, Subject } from 'rxjs';
-import { Filter, HashMap } from './filters.model';
+import { combineLatest, merge, NEVER, Observable, of, Subject } from 'rxjs';
 import {
-  debounceTime, delay,
-  distinctUntilChanged,
+  Filter,
+  SearchState,
+  SearchStateUpdate,
+  SearchStateUpdateEventUnion,
+  StateUpdateType,
+} from './filters.model';
+import {
+  catchError,
+  debounceTime,
+  delay,
+  filter,
+  map,
   scan,
+  share,
   startWith,
   switchMap,
   tap,
+  withLatestFrom,
 } from 'rxjs/operators';
 import { SERVER_SIDE_FILTERS } from './search.response';
 
-type ActiveFiltersMap = HashMap<boolean>;
+const EMPTY_SEARCH_STATE_UPDATE = {
+  activeFiltersUpdateMap: {},
+  amountOfResultsUpdate: undefined,
+};
+
+const EMPTY_SEARCH_STATE = {
+  hasOptimisticUpdates: false,
+  activeFiltersMap: {},
+  amountOfResults: undefined,
+  filters: [],
+};
 
 @Injectable({
   providedIn: 'root',
 })
 export class SearchService {
-  /**
-   * Filters
-   */
-  filters$: Observable<Filter[]>;
+  state$: Observable<SearchState>;
 
-  /**
-   * Active filters
-   */
-  activeFiltersState: Observable<ActiveFiltersMap>; // active filters + optimistic updates
-
-  private activeFiltersSubject: Subject<ActiveFiltersMap>;
-  private optimisticUpdateSubject: Subject<ActiveFiltersMap | 'reset'>;
+  private requestOptions$ = new Subject<any>();
+  private cachedState$ = new Subject<SearchState>();
+  private stateUpdate$ = new Subject<SearchStateUpdateEventUnion>();
 
   constructor() {
-    this.activeFiltersSubject = new Subject<ActiveFiltersMap>();
-    this.optimisticUpdateSubject = new Subject<ActiveFiltersMap>();
+    this.initState();
+  }
 
-    this.activeFiltersState = combineLatest(
-      this.activeFiltersSubject.asObservable(),
-      this.optimisticUpdateSubject.pipe(
-        scan(
-          (acc, update) => (update === 'reset' ? {} : { ...acc, ...update }),
-          {}
-        )
+  activateFilter({ lookupValue }: Filter) {
+    this.stateUpdate$.next({
+      type: StateUpdateType.ACTIVATE_FILTER,
+      payload: lookupValue,
+    });
+  }
+
+  deactivateFilter({ lookupValue }: Filter) {
+    this.stateUpdate$.next({
+      type: StateUpdateType.DEACTIVATE_FILTER,
+      payload: lookupValue,
+    });
+  }
+
+  loadResults(amount: number) {
+    this.stateUpdate$.next({
+      type: StateUpdateType.AMOUNT_OF_RESULTS,
+      payload: amount,
+    });
+  }
+
+  search() {
+    this.requestOptions$.next({});
+  }
+
+  private initState() {
+    const optimisticState$: Observable<SearchState> = this.stateUpdate$.pipe(
+      scan<SearchStateUpdateEventUnion, SearchStateUpdate>(
+        this.stateUpdateReducer,
+        EMPTY_SEARCH_STATE_UPDATE
       ),
-      (activeFilters, unprocessedFilters) => ({
-        ...activeFilters,
-        ...unprocessedFilters,
-      })
-    ).pipe(startWith({}));
+      withLatestFrom(this.cachedState$),
+      map(([updates, cachedState]) =>
+        this.createUpdatedState(cachedState, updates)
+      ),
+      share()
+    );
 
-    this.filters$ = this.activeFiltersState.pipe(
-      distinctUntilChanged((previousFiltersMap, newFiltersMap) => {
-        const previousFilters = Object.keys(previousFiltersMap);
-        if (previousFilters.length !== Object.keys(newFiltersMap).length) {
-          return false;
-        }
-
-        return previousFilters.every(
-          (filterKey) =>
-            previousFiltersMap[filterKey] === newFiltersMap[filterKey]
-        );
-      }),
-      delay(100),
-      switchMap((activeFilters) => {
-        console.log('New server params: ', activeFilters);
-
-        if (
-          activeFilters['fail-to-activate'] ||
-          activeFilters['fail-to-deactivate'] === false
-        ) {
-
-          this.clearOptimisticUpdates();
-          return NEVER;
-        }
-
-        return of(SERVER_SIDE_FILTERS).pipe(
-          tap(() => {
-            this.activeFiltersSubject.next(activeFilters);
-            this.clearOptimisticUpdates();
+    const validatedState$ = combineLatest(
+      this.requestOptions$,
+      optimisticState$.pipe(
+        debounceTime(200),
+        filter(({ hasOptimisticUpdates }) => hasOptimisticUpdates),
+        startWith(EMPTY_SEARCH_STATE)
+      ),
+      Object.assign
+    ).pipe(
+      switchMap((request) =>
+        this.performRequest(request).pipe(
+          tap((newState) => {
+            this.cachedState$.next(newState);
+            this.stateUpdate$.next({
+              type: StateUpdateType.RESET,
+              payload: undefined,
+            });
+          }),
+          catchError((e) => {
+            this.stateUpdate$.next({
+              type: StateUpdateType.RESET,
+              payload: undefined,
+            });
+            return NEVER;
           })
-        );
+        )
+      )
+    );
+
+    this.state$ = merge(validatedState$, optimisticState$);
+  }
+
+  private stateUpdateReducer(
+    queuedUpdates: SearchStateUpdate,
+    event: SearchStateUpdateEventUnion
+  ): SearchStateUpdate {
+    if (event.type === StateUpdateType.RESET) {
+      return EMPTY_SEARCH_STATE_UPDATE;
+    }
+
+    if (event.type === StateUpdateType.AMOUNT_OF_RESULTS) {
+      return {
+        ...queuedUpdates,
+        amountOfResultsUpdate: event.payload,
+      };
+    }
+
+    const { activeFiltersUpdateMap } = queuedUpdates;
+
+    if (
+      event.type === StateUpdateType.ACTIVATE_FILTER ||
+      event.type === StateUpdateType.DEACTIVATE_FILTER
+    ) {
+      const activate = event.type === StateUpdateType.ACTIVATE_FILTER;
+      if (activeFiltersUpdateMap[event.payload] === !activate) {
+        // Cancel opposite queued update.
+        delete activeFiltersUpdateMap[event.payload];
+        return {
+          ...queuedUpdates,
+          activeFiltersUpdateMap,
+        };
+      } else {
+        // Add to queued updates.
+        return {
+          ...queuedUpdates,
+          activeFiltersUpdateMap: {
+            ...activeFiltersUpdateMap,
+            [event.payload]: activate,
+          },
+        };
+      }
+    }
+  }
+
+  private createUpdatedState(
+    { activeFiltersMap, filters, amountOfResults }: SearchState,
+    { activeFiltersUpdateMap, amountOfResultsUpdate }: SearchStateUpdate
+  ): SearchState {
+    const amountOfResultsChanged =
+      amountOfResultsUpdate !== undefined &&
+      amountOfResultsUpdate !== amountOfResults;
+
+    const filtersChanged = Object.keys(activeFiltersUpdateMap).length !== 0;
+
+    return {
+      hasOptimisticUpdates: amountOfResultsChanged || filtersChanged,
+      activeFiltersMap: {
+        ...activeFiltersMap,
+        ...activeFiltersUpdateMap,
+      },
+      amountOfResults: amountOfResultsUpdate || amountOfResults,
+      filters,
+    };
+  }
+
+  private performRequest(request) {
+    return of(request).pipe(
+      delay(100),
+      map((response) => {
+        if (
+          response.activeFiltersMap['fail-to-activate'] ||
+          response.activeFiltersMap['fail-to-deactivate'] === false
+        ) {
+          throw Error();
+        }
+        return {
+          hasOptimisticUpdates: false,
+          activeFiltersMap: response.activeFiltersMap,
+          filters: SERVER_SIDE_FILTERS,
+          amountOfResults: response.amountOfResults,
+        };
       })
     );
-  }
-
-  activateFilter(filter: Filter) {
-    this.optimisticUpdateSubject.next({
-      [filter.lookupValue]: true,
-    });
-  }
-
-  deactivateFilter(filter: Filter) {
-    this.optimisticUpdateSubject.next({
-      [filter.lookupValue]: false,
-    });
-  }
-
-  private clearOptimisticUpdates() {
-    this.optimisticUpdateSubject.next('reset');
   }
 }

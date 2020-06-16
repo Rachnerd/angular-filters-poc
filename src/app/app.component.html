@@ -1,11 +1,9 @@
-<app-filters
-  *ngIf="filters$ | async as filters; else loading"
-  [filters]="filters"
-  [activeFilters]="activeFilters$ | async"
-  (activate)="activateFilter($event)"
-  (deactivate)="deactivateFilter($event)"
-></app-filters>
-
-<ng-template #loading>
-  LOADING
-</ng-template>
+{{ printState$ | async | json }}
+<ng-container *ngIf="filtersState$ | async as filtersState">
+  <app-filters
+    [filters]="filtersState.filters"
+    [activeFilters]="filtersState.activeFiltersMap"
+    (activate)="activateFilter($event)"
+    (deactivate)="deactivateFilter($event)"
+  ></app-filters>
+</ng-container>

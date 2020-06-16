@@ -9,12 +9,12 @@
     >
       <label>
         {{ filter.value }}
-        <input
-          type="radio"
-          [value]="filter.lookupValue"
-          [checked]="activeFilters[filter.lookupValue]"
-        />
       </label>
+      <input
+        type="radio"
+        [value]="filter.lookupValue"
+        [checked]="activeFilters[filter.lookupValue]"
+      />
     </li>
   </ul>
 </div>
