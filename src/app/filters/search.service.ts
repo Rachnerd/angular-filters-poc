@@ -74,6 +74,9 @@ export class SearchService {
   }
 
   private initState() {
+    /**
+     * Combine incoming updates with cached state to create optimistic state.
+     */
     const optimisticState$: Observable<SearchState> = this.stateUpdate$.pipe(
       scan<SearchStateUpdateEventUnion, SearchStateUpdate>(
         this.stateUpdateReducer,
@@ -83,14 +86,30 @@ export class SearchService {
       map(([updates, cachedState]) =>
         this.createUpdatedState(cachedState, updates)
       ),
+      /**
+       * This observable is subscribed twice (validatedState$ and state$). "Share" makes sure that all operators before it will not be
+       * executed for each subscriber. So the two current subscribers "share" the result of this stream.
+       */
       share()
     );
 
+    /**
+     * Combine optimistic state with request params and validate it with the backend.
+     */
     const validatedState$ = combineLatest(
       this.requestOptions$,
       optimisticState$.pipe(
+        /**
+         * Prevent server spamming
+         */
         debounceTime(200),
+        /**
+         * Only perform a call if state is out of sync with the backend.
+         */
         filter(({ hasOptimisticUpdates }) => hasOptimisticUpdates),
+        /**
+         * Trigger the first call without waiting for updates.
+         */
         startWith(EMPTY_SEARCH_STATE)
       ),
       Object.assign
@@ -115,9 +134,15 @@ export class SearchService {
       )
     );
 
+    /**
+     * Merge the optimistic updates for instant UI changes and server validation for asynchronous confirmation/rejection of the updates.
+     */
     this.state$ = merge(validatedState$, optimisticState$);
   }
 
+  /**
+   * Reducer that applies update actions to a SearchStateUpdate object.
+   */
   private stateUpdateReducer(
     queuedUpdates: SearchStateUpdate,
     event: SearchStateUpdateEventUnion
@@ -160,6 +185,9 @@ export class SearchService {
     }
   }
 
+  /**
+   * Merge state with state updates.
+   */
   private createUpdatedState(
     { activeFiltersMap, filters, amountOfResults }: SearchState,
     { activeFiltersUpdateMap, amountOfResultsUpdate }: SearchStateUpdate
@@ -181,6 +209,9 @@ export class SearchService {
     };
   }
 
+  /**
+   * Perform the HTTP request.
+   */
   private performRequest(request) {
     return of(request).pipe(
       delay(100),
