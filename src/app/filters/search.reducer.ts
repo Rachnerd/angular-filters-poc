@@ -4,7 +4,7 @@ import {
   StateUpdateType,
 } from './filters.model';
 
-const EMPTY_SEARCH_STATE_UPDATE = {
+export const EMPTY_SEARCH_STATE_UPDATE = {
   activeFiltersUpdateMap: {},
   amountOfResultsUpdate: undefined,
 };
@@ -51,5 +51,7 @@ export function searchReducer(
         },
       };
     }
+  } else {
+    throw Error(`Uncaught action type passed ${action.type}`);
   }
 }

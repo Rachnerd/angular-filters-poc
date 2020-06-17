@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { combineLatest, merge, NEVER, Observable, Subject } from 'rxjs';
+import { combineLatest, merge, NEVER, Observable, of, Subject } from 'rxjs';
 import {
   Filter,
   SearchState,
@@ -45,10 +45,14 @@ export class SearchStateService {
   private stateUpdate$ = new Subject<SearchStateActionUnion>();
 
   constructor(private searchService: SearchService) {
+    this.init();
+  }
+
+  init() {
     /**
      * Combine incoming updates with cached state to create optimistic state.
      */
-    const optimisticState$: Observable<SearchState> = this.stateUpdate$.pipe(
+    const optimisticState$ = this.stateUpdate$.pipe(
       scan<SearchStateActionUnion, SearchStateUpdate>(
         searchReducer,
         EMPTY_SEARCH_STATE_UPDATE
@@ -87,20 +91,15 @@ export class SearchStateService {
     ).pipe(
       switchMap((request) =>
         this.searchService.search$(request).pipe(
-          tap((newState) => {
-            this.cachedState$.next(newState);
+          tap((newState) => this.cachedState$.next(newState)),
+          catchError((error) => of(error)),
+          tap(() => {
             this.stateUpdate$.next({
               type: StateUpdateType.RESET,
               payload: undefined,
             });
           }),
-          catchError((e) => {
-            this.stateUpdate$.next({
-              type: StateUpdateType.RESET,
-              payload: undefined,
-            });
-            return NEVER;
-          })
+          switchMap(() => NEVER)
         )
       )
     );
