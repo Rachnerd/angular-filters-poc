@@ -65,7 +65,7 @@ describe('SearchState service', () => {
   it('should emit optimistic state and then validated state', () => {
     /**
      * requestOptions$: a--
-     * search$ 1:       -a|       -a|
+     * search$:         -a|       -b|
      * stateUpdate$:    --a
      *
      * Result:          -ab 199ms -c--
@@ -91,8 +91,8 @@ describe('SearchState service', () => {
           })
         )
         .mockReturnValueOnce(
-          cold('-a|', {
-            a: {
+          cold('-b|', {
+            b: {
               hasOptimisticUpdates: false,
               activeFiltersMap: { A: true },
               filters: [],
@@ -135,7 +135,7 @@ describe('SearchState service', () => {
   it('should collect incoming updates and request the server after 200ms of no more incoming updates', () => {
     /**
      * requestOptions$: a---
-     * search$:         -a|                     -a|
+     * search$:         -a|                     -b|
      * stateUpdate$:    --a 20ms b 20ms c
      * state$:          -ab 20ms c 20ms d 199ms -e
      */
@@ -157,8 +157,8 @@ describe('SearchState service', () => {
           })
         )
         .mockReturnValueOnce(
-          cold('-a|', {
-            a: {
+          cold('-b|', {
+            b: {
               hasOptimisticUpdates: false,
               activeFiltersMap: { A: true, B: true, C: true },
               filters: [],
@@ -220,7 +220,7 @@ describe('SearchState service', () => {
   it('should not send a request if incoming updates cancel each other out', () => {
     /**
      * requestOptions$: a---
-     * search$ 1:       -a|
+     * search$:         -a|
      * stateUpdate$:    --ab
      * state$:          -aba 200ms ---
      */
@@ -275,7 +275,7 @@ describe('SearchState service', () => {
   it('should send a request with only relevant updates', () => {
     /**
      * requestOptions$: a---
-     * search$ 1:       -a|         -a|
+     * search$:         -a|         -b|
      * stateUpdate$:    --abc
      * state$:          -abac 199ms -d
      */
@@ -297,8 +297,8 @@ describe('SearchState service', () => {
           })
         )
         .mockReturnValueOnce(
-          cold('-a|', {
-            a: {
+          cold('-b|', {
+            b: {
               hasOptimisticUpdates: false,
               activeFiltersMap: {},
               filters: [],
