@@ -16,18 +16,22 @@ import {
   share,
   startWith,
   switchMap,
+  takeUntil,
   tap,
   withLatestFrom,
 } from 'rxjs/operators';
-import { searchReducer } from './search.reducer';
+import {
+  applySearchStateUpdate,
+  searchStateReducer,
+} from './search-state.reducer';
 import { SearchService } from './search.service';
 
-const EMPTY_SEARCH_STATE_UPDATE = {
-  activeFiltersUpdateMap: {},
-  amountOfResultsUpdate: undefined,
+const EMPTY_SEARCH_STATE_UPDATE: SearchStateUpdate = {
+  activeFiltersMap: {},
+  amountOfResults: undefined,
 };
 
-const EMPTY_SEARCH_STATE = {
+const EMPTY_SEARCH_STATE: SearchState = {
   hasOptimisticUpdates: false,
   activeFiltersMap: {},
   amountOfResults: undefined,
@@ -40,7 +44,7 @@ const EMPTY_SEARCH_STATE = {
 export class SearchStateService {
   state$: Observable<SearchState>;
 
-  private requestOptions$ = new Subject<any>();
+  private requestOptions$ = new Subject<{}>();
   private cachedState$ = new Subject<SearchState>();
   private stateUpdate$ = new Subject<SearchStateActionUnion>();
 
@@ -54,12 +58,12 @@ export class SearchStateService {
      */
     const optimisticState$ = this.stateUpdate$.pipe(
       scan<SearchStateActionUnion, SearchStateUpdate>(
-        searchReducer,
+        searchStateReducer,
         EMPTY_SEARCH_STATE_UPDATE
       ),
       withLatestFrom(this.cachedState$),
       map(([updates, cachedState]) =>
-        this.createUpdatedState(cachedState, updates)
+        applySearchStateUpdate(cachedState, updates)
       ),
       /**
        * This observable is subscribed twice (validatedState$ and state$). "Share" makes sure that all operators before it will not be
@@ -91,6 +95,7 @@ export class SearchStateService {
     ).pipe(
       switchMap((request) =>
         this.searchService.search$(request).pipe(
+          takeUntil(this.stateUpdate$),
           tap((newState) => this.cachedState$.next(newState)),
           catchError((error) => of(error)),
           tap(() => {
@@ -133,29 +138,5 @@ export class SearchStateService {
 
   search() {
     this.requestOptions$.next({});
-  }
-
-  /**
-   * Merge state with state updates.
-   */
-  private createUpdatedState(
-    { activeFiltersMap, filters, amountOfResults }: SearchState,
-    { activeFiltersUpdateMap, amountOfResultsUpdate }: SearchStateUpdate
-  ): SearchState {
-    const amountOfResultsChanged =
-      amountOfResultsUpdate !== undefined &&
-      amountOfResultsUpdate !== amountOfResults;
-
-    const filtersChanged = Object.keys(activeFiltersUpdateMap).length !== 0;
-
-    return {
-      hasOptimisticUpdates: amountOfResultsChanged || filtersChanged,
-      activeFiltersMap: {
-        ...activeFiltersMap,
-        ...activeFiltersUpdateMap,
-      },
-      amountOfResults: amountOfResultsUpdate || amountOfResults,
-      filters,
-    };
   }
 }

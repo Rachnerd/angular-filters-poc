@@ -17,10 +17,10 @@ export interface SearchState {
   amountOfResults?: number;
 }
 
-export interface SearchStateUpdate {
-  activeFiltersUpdateMap: ActiveFiltersMap;
-  amountOfResultsUpdate: number;
-}
+export type SearchStateUpdate = Pick<
+  SearchState,
+  'activeFiltersMap' | 'amountOfResults'
+>;
 
 export enum StateUpdateType {
   ACTIVATE_FILTER,

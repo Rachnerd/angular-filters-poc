@@ -14,8 +14,6 @@ describe('SearchState service', () => {
 
   beforeEach(() => {
     scheduler = new TestScheduler((actual, expected) => {
-      console.log(actual);
-      console.log(expected);
       expect(actual).toMatchObject(expected);
     });
     searchStateService = new SearchStateService(searchService as any);
@@ -353,6 +351,75 @@ describe('SearchState service', () => {
         activeFiltersMap: {},
         amountOfResults: 10,
       });
+    });
+  });
+
+  it('should clear the optimistic updates if the request fails', () => {
+    /**
+     * requestOptions$: a---
+     * search$:         -a|         -#
+     * stateUpdate$:    --abc
+     * state$:          -abcd 199ms -a
+     */
+    scheduler.run(({ expectObservable, cold, hot, flush }) => {
+      /* tslint:disable-next-line */
+      searchStateService['requestOptions$'] = hot('a', {
+        a: {},
+      });
+
+      searchService.search$
+        .mockReturnValueOnce(
+          cold('-a|', {
+            a: {
+              hasOptimisticUpdates: false,
+              activeFiltersMap: {},
+              filters: [],
+              amountOfResults: 0,
+            },
+          })
+        )
+        .mockReturnValueOnce(cold('-#'));
+
+      /* tslint:disable-next-line */
+      searchStateService['stateUpdate$'] = hot('--abc', {
+        a: {
+          type: StateUpdateType.ACTIVATE_FILTER,
+          payload: 'A',
+        } as SearchStateActionUnion,
+        b: {
+          type: StateUpdateType.ACTIVATE_FILTER,
+          payload: 'B',
+        } as SearchStateActionUnion,
+        c: {
+          type: StateUpdateType.ACTIVATE_FILTER,
+          payload: 'C',
+        } as SearchStateActionUnion,
+      });
+
+      searchStateService.init();
+
+      expectObservable(searchStateService.state$).toBe('-abcd 199ms -a', {
+        a: {
+          hasOptimisticUpdates: false,
+          activeFiltersMap: {},
+        },
+        b: {
+          hasOptimisticUpdates: true,
+          activeFiltersMap: { A: true },
+        },
+        c: {
+          hasOptimisticUpdates: true,
+          activeFiltersMap: { A: true, B: true },
+        },
+        d: {
+          hasOptimisticUpdates: true,
+          activeFiltersMap: { A: true, B: true, C: true },
+        },
+      });
+
+      flush();
+
+      expect(searchService.search$).toHaveBeenCalledTimes(2);
     });
   });
 });

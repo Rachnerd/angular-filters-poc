@@ -1,10 +1,14 @@
-import { EMPTY_SEARCH_STATE_UPDATE, searchReducer } from './search.reducer';
+import {
+  applySearchStateUpdate,
+  EMPTY_SEARCH_STATE_UPDATE,
+  searchStateReducer,
+} from './search-state.reducer';
 import { SearchStateActionUnion, StateUpdateType } from './filters.model';
 
 describe('Search reducer', () => {
   function getState(actions: SearchStateActionUnion[]) {
     return actions.reduce(
-      (state, action) => searchReducer(state, action),
+      (state, action) => searchStateReducer(state, action),
       EMPTY_SEARCH_STATE_UPDATE
     );
   }
@@ -14,8 +18,8 @@ describe('Search reducer', () => {
       expect(
         getState([{ type: StateUpdateType.ACTIVATE_FILTER, payload: 'A' }])
       ).toEqual({
-        activeFiltersUpdateMap: { A: true },
-        amountOfResultsUpdate: undefined,
+        amountOfResults: undefined,
+        activeFiltersMap: { A: true },
       });
     });
 
@@ -26,8 +30,9 @@ describe('Search reducer', () => {
           { type: StateUpdateType.DEACTIVATE_FILTER, payload: 'A' },
         ])
       ).toEqual({
-        activeFiltersUpdateMap: {},
-        amountOfResultsUpdate: undefined,
+        activeFiltersMap: {},
+
+        amountOfResults: undefined,
       });
     });
 
@@ -35,8 +40,8 @@ describe('Search reducer', () => {
       expect(
         getState([{ type: StateUpdateType.DEACTIVATE_FILTER, payload: 'A' }])
       ).toEqual({
-        activeFiltersUpdateMap: { A: false },
-        amountOfResultsUpdate: undefined,
+        activeFiltersMap: { A: false },
+        amountOfResults: undefined,
       });
     });
 
@@ -47,8 +52,8 @@ describe('Search reducer', () => {
           { type: StateUpdateType.ACTIVATE_FILTER, payload: 'A' },
         ])
       ).toEqual({
-        activeFiltersUpdateMap: {},
-        amountOfResultsUpdate: undefined,
+        amountOfResults: undefined,
+        activeFiltersMap: {},
       });
     });
 
@@ -60,8 +65,8 @@ describe('Search reducer', () => {
           { type: StateUpdateType.DEACTIVATE_FILTER, payload: 'A' },
         ])
       ).toEqual({
-        activeFiltersUpdateMap: { A: false },
-        amountOfResultsUpdate: undefined,
+        amountOfResults: undefined,
+        activeFiltersMap: { A: false },
       });
     });
   });
@@ -71,8 +76,8 @@ describe('Search reducer', () => {
       expect(
         getState([{ type: StateUpdateType.AMOUNT_OF_RESULTS, payload: 10 }])
       ).toEqual({
-        activeFiltersUpdateMap: {},
-        amountOfResultsUpdate: 10,
+        amountOfResults: 10,
+        activeFiltersMap: {},
       });
     });
   });
@@ -88,5 +93,49 @@ describe('Search reducer', () => {
 
   it('should throw an error if an uncaught action type is passed', () => {
     expect(() => getState([{ type: 'error' as any, payload: 'A' }])).toThrow();
+  });
+
+  describe('Applying the update to the state', () => {
+    it('should apply the update', () => {
+      expect(
+        applySearchStateUpdate(
+          {
+            amountOfResults: undefined,
+            hasOptimisticUpdates: false,
+            activeFiltersMap: {},
+            filters: [],
+          },
+          {
+            amountOfResults: 1,
+            activeFiltersMap: { A: true },
+          }
+        )
+      ).toMatchObject({
+        amountOfResults: 1,
+        hasOptimisticUpdates: true,
+        activeFiltersMap: { A: true },
+      });
+    });
+
+    it('should detect if there are no changes in the result', () => {
+      expect(
+        applySearchStateUpdate(
+          {
+            amountOfResults: 1,
+            hasOptimisticUpdates: false,
+            activeFiltersMap: { A: true },
+            filters: [],
+          },
+          {
+            amountOfResults: 1,
+            activeFiltersMap: { A: true },
+          }
+        )
+      ).toMatchObject({
+        amountOfResults: 1,
+        hasOptimisticUpdates: false,
+        activeFiltersMap: { A: true },
+      });
+    });
   });
 });
